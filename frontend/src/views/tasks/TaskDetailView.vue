@@ -62,7 +62,7 @@
 			<div class="columns mbs-2">
 				<!-- Content -->
 				<div
-					:class="{'is-two-thirds': canWrite}"
+					:class="{'is-two-thirds': canWrite && !authStore.userDisplayName.includes('client')}"
 					class="column detail-content"
 				>
 					<div class="columns details">
@@ -410,7 +410,7 @@
 				
 				<!-- Task Actions -->
 				<div
-					v-if="canWrite || isModal"
+					v-if="(canWrite && !authStore.userDisplayName.includes('client')) || isModal"
 					class="column is-one-third action-buttons d-print-none"
 				>
 					<template v-if="canWrite">
