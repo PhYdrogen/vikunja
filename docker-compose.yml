@@ -9,7 +9,7 @@ services:
       VIKUNJA_DATABASE_USER: ${VIKUNJA_DATABASE_USER}
       VIKUNJA_DATABASE_DATABASE: ${VIKUNJA_DATABASE_DATABASE}
       VIKUNJA_SERVICE_JWTSECRET: ${VIKUNJA_SERVICE_JWTSECRET}
-      VIKUNJA_SERVICE_CUSTOMLOGOURL: "https://github.com/PhYdrogen/vikunja/blob/81cd8f0f68115de548035ffe4f5d3e44a0f46579/images/image.png" 
+      VIKUNJA_SERVICE_CUSTOMLOGOURL: "https://github.com/PhYdrogen/vikunja/blob/81cd8f0f68115de548035ffe4f5d3e44a0f46579/images/image.png?raw=true" 
       VIKUNJA_SERVICE_ALLOWICONCHANGES: false
     expose:
       - 3456
