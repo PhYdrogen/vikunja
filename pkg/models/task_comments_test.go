@@ -75,7 +75,7 @@ func TestTaskComment_Create(t *testing.T) {
 		task, err := GetTaskByIDSimple(s, 32)
 		require.NoError(t, err)
 		tc := &TaskComment{
-			Comment: "Lorem Ipsum @user2",
+			Comment: `<p>Lorem Ipsum <mention-user data-id="user2">@user2</mention-user></p>`,
 			TaskID:  32, // user2 has access to the project that task belongs to
 		}
 		err = tc.Create(s, u)

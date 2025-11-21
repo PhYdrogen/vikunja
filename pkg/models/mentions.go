@@ -17,25 +17,60 @@
 package models
 
 import (
-	"regexp"
 	"strings"
 
 	"code.vikunja.io/api/pkg/user"
 
+	"golang.org/x/net/html"
 	"xorm.io/xorm"
 )
 
 func FindMentionedUsersInText(s *xorm.Session, text string) (users map[int64]*user.User, err error) {
-	reg := regexp.MustCompile(`@\w+`)
-	matches := reg.FindAllString(text, -1)
-	if matches == nil {
+	usernames := extractMentionedUsernames(text)
+	if len(usernames) == 0 {
 		return
 	}
 
-	usernames := []string{}
-	for _, match := range matches {
-		usernames = append(usernames, strings.TrimPrefix(match, "@"))
+	return user.GetUsersByUsername(s, usernames, true)
+}
+
+// extractMentionedUsernames parses HTML content and extracts usernames from mention spans.
+// It looks for <mention-user data-id="username"> elements and returns the usernames.
+func extractMentionedUsernames(htmlText string) []string {
+	doc, err := html.Parse(strings.NewReader(htmlText))
+	if err != nil {
+		return nil
 	}
 
-	return user.GetUsersByUsername(s, usernames, true)
+	usernames := []string{}
+	seen := make(map[string]bool) // Deduplicate usernames
+
+	var traverse func(*html.Node)
+	traverse = func(n *html.Node) {
+		if n.Type == html.ElementNode && n.Data == "mention-user" {
+			var dataID string
+
+			// Extract data-id attribute
+			for _, attr := range n.Attr {
+				if attr.Key == "data-id" {
+					dataID = attr.Val
+				}
+			}
+
+			if dataID != "" {
+				if !seen[dataID] {
+					usernames = append(usernames, dataID)
+					seen[dataID] = true
+				}
+			}
+		}
+
+		// Traverse child nodes
+		for child := n.FirstChild; child != nil; child = child.NextSibling {
+			traverse(child)
+		}
+	}
+
+	traverse(doc)
+	return usernames
 }

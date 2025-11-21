@@ -60,6 +60,7 @@
 				v-if="project.maxPermission > PERMISSIONS.READ"
 				class="menu-list-dropdown"
 				:project="project"
+				:simple="true"
 			>
 				<template #trigger="{toggleOpen}">
 					<BaseButton
@@ -159,11 +160,8 @@ const childProjects = computed(() => {
 	opacity: 1;
 }
 
-.list-menu:hover .color-bubble-wrapper > {
-	.saved-filter-icon,
-	.color-bubble {
-		opacity: 0;
-	}
+.list-menu:hover .color-bubble-wrapper > .color-bubble {
+	opacity: 0;
 }
 
 .is-touch .color-bubble {

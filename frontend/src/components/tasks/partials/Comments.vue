@@ -101,6 +101,8 @@
 						:bottom-actions="actions[c.id]"
 						:show-save="true"
 						:enable-discard-shortcut="true"
+						:enable-mentions="true"
+						:mention-project-id="projectId"
 						initial-mode="preview"
 						@update:modelValue="
 							() => {
@@ -168,6 +170,8 @@
 								}"
 								:upload-callback="attachmentUpload"
 								:placeholder="$t('task.comment.placeholder')"
+								:enable-mentions="true"
+								:mention-project-id="projectId"
 								@save="addComment()"
 							/>
 						</div>
@@ -206,7 +210,7 @@
 </template>
 
 <script setup lang="ts">
-import {ref, reactive, computed, shallowReactive, watch, nextTick} from 'vue'
+import {ref, reactive, computed, shallowReactive, watch} from 'vue'
 import {useI18n} from 'vue-i18n'
 
 import CustomTransition from '@/components/misc/CustomTransition.vue'
@@ -231,6 +235,7 @@ import {useCopyToClipboard} from '@/composables/useCopyToClipboard'
 
 const props = withDefaults(defineProps<{
 	taskId: number,
+	projectId: number,
 	canWrite?: boolean
 	initialComments: ITaskComment[]
 }>(), {
@@ -363,13 +368,6 @@ async function addComment() {
 		return
 	}
 
-	// This makes the editor trigger its mounted function again which makes it forget every input
-	// it currently has in its textarea. This is a counter-hack to a hack inside of vue-easymde
-	// which made it impossible to detect change from the outside. Therefore the component would
-	// not update if new content from the outside was made available.
-	// See https://github.com/NikulinIlya/vue-easymde/issues/3
-	editorActive.value = false
-	nextTick(() => (editorActive.value = true))
 	creating.value = true
 
 	try {

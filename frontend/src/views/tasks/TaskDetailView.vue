@@ -14,7 +14,7 @@
 			<BaseButton
 				v-if="!isModal || isMobile"
 				class="back-button mbs-2"
-				@click="router.options.history.state?.back?.includes('/projects/') ? router.back() : router.push(projectRoute)"
+				@click="lastProject ? router.back() : router.push(projectRoute)"
 			>
 				<Icon icon="arrow-left" />
 				{{ $t('task.detail.back') }}
@@ -346,7 +346,7 @@
 
 					<!-- Attachments -->
 					<div
-						v-if="activeFields.attachments || hasAttachments"
+						v-show="activeFields.attachments || hasAttachments"
 						class="content attachments"
 					>
 						<Attachments
@@ -404,6 +404,7 @@
 					<Comments
 						:can-write="canWrite"
 						:task-id="taskId"
+						:project-id="task.projectId"
 						:initial-comments="task.comments"
 					/>
 				</div>
@@ -597,7 +598,7 @@
 
 <script lang="ts" setup>
 import {ref, reactive, shallowReactive, computed, watch, nextTick, onMounted, onBeforeUnmount} from 'vue'
-import {useRouter, type RouteLocation, onBeforeRouteLeave} from 'vue-router'
+import {useRouter, useRoute, type RouteLocation, onBeforeRouteLeave} from 'vue-router'
 import {storeToRefs} from 'pinia'
 import {useI18n} from 'vue-i18n'
 import {unrefElement, useMediaQuery} from '@vueuse/core'
@@ -665,6 +666,7 @@ defineEmits<{
 }>()
 
 const router = useRouter()
+const route = useRoute()
 const {t} = useI18n({useScope: 'global'})
 
 const projectStore = useProjectStore()
@@ -690,6 +692,24 @@ function saveTaskViaHotkey(event) {
 	saveTask()
 }
 
+const lastProject = computed(() => {
+	const backRoute = router.options.history.state?.back
+	if (!backRoute || typeof backRoute !== 'string') {
+		return null
+	}
+
+	const projectMatch = backRoute.match(/\/projects\/(-?\d+)/)
+	if (!projectMatch || !projectMatch[1]) {
+		return null
+	}
+
+	const id = parseInt(projectMatch[1])
+
+	return projectStore.projects[id] ?? null
+})
+
+const lastProjectOrTaskProject = computed(() => lastProject.value ?? project.value)
+
 onMounted(() => {
 	document.addEventListener('keydown', saveTaskViaHotkey)
 })
@@ -703,14 +723,14 @@ onBeforeRouteLeave(async () => {
 		return
 	}
 
-	if (!project.value) {
+	if (!lastProjectOrTaskProject.value) {
 		await new Promise<void>((resolve) => {
 			const timeout = setTimeout(() => {
 				stop()
 				resolve()
 			}, 5000) // 5 second timeout
 			
-			const stop = watch(project, (p) => {
+			const stop = watch(lastProjectOrTaskProject, (p) => {
 				if (p) {
 					clearTimeout(timeout)
 					stop()
@@ -720,8 +740,8 @@ onBeforeRouteLeave(async () => {
 		})
 	}
 
-	if (project.value) {
-		await baseStore.handleSetCurrentProjectIfNotSet(project.value)
+	if (lastProjectOrTaskProject.value) {
+		await baseStore.handleSetCurrentProjectIfNotSet(lastProjectOrTaskProject.value)
 	}
 })
 
@@ -741,6 +761,7 @@ const project = computed(() => projectStore.projects[task.value.projectId])
 const projectRoute = computed(() => ({
 	name: 'project.index',
 	params: {projectId: task.value.projectId},
+	hash: route.hash,
 }))
 
 const canWrite = computed(() => (
@@ -786,8 +807,8 @@ watch(
 			taskColor.value = task.value.hexColor
 			setActiveFields()
 
-			if (project.value) {
-				await baseStore.handleSetCurrentProjectIfNotSet(project.value)
+			if (lastProject.value) {
+				await baseStore.handleSetCurrentProjectIfNotSet(lastProject.value)
 			}
 		} catch (e) {
 			if (e?.response?.status === 404) {

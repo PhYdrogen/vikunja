@@ -56,8 +56,8 @@
 										class="title input"
 										:contenteditable="(bucketTitleEditable && canWrite && !collapsedBuckets[bucket.id]) ? true : undefined"
 										:spellcheck="false"
-										@keydown.enter.prevent.stop="($event.target as HTMLElement).blur()"
-										@keydown.esc.prevent.stop="($event.target as HTMLElement).blur()"
+										@keydown.enter.prevent.stop="!$event.isComposing && ($event.target as HTMLElement).blur()"
+										@keydown.esc.prevent.stop="!$event.isComposing && ($event.target as HTMLElement).blur()"
 										@blur="saveBucketTitle(bucket.id, ($event.target as HTMLElement).textContent as string)"
 										@click="focusBucketTitle"
 									>
@@ -511,7 +511,7 @@ async function updateTaskPosition(e) {
 		: e.newIndex
 
 	const task = newBucket.tasks[newTaskIndex]
-	const oldBucket = buckets.value.find(b => b.id === task.bucketId)
+	const oldBucket = buckets.value.find(b => b.id === sourceBucket.value)
 	const taskBefore = newBucket.tasks[newTaskIndex - 1] ?? null
 	const taskAfter = newBucket.tasks[newTaskIndex + 1] ?? null
 	taskUpdating.value[task.id] = true

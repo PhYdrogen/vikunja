@@ -109,6 +109,7 @@ import Pagination from '@/components/misc/Pagination.vue'
 import {ALPHABETICAL_SORT} from '@/components/project/partials/Filters.vue'
 
 import {useTaskList} from '@/composables/useTaskList'
+import {shouldShowTaskInListView} from '@/composables/useTaskListFiltering'
 import {PERMISSIONS as Permissions} from '@/constants/permissions'
 import {calculateItemPosition} from '@/helpers/calculateItemPosition'
 import type {ITask} from '@/modelTypes/ITask'
@@ -148,8 +149,8 @@ const {
 	() => props.viewId,
 	{position: 'asc'},
 	() => projectId.value === -1
-		? null
-		: 'subtasks',
+		? 'comment_count'
+		: ['subtasks', 'comment_count'],
 )
 
 const taskPositionService = ref(new TaskPositionService())
@@ -161,13 +162,7 @@ const tasks = ref<ITask[]>([])
 watch(
 	allTasks,
 	() => {
-		tasks.value = [...allTasks.value]
-		if (projectId.value < 0) {
-			return
-		}
-		tasks.value = tasks.value.filter(t => {
-			return !((t.relatedTasks?.parenttask?.length ?? 0) > 0)
-		})
+		tasks.value = ([...allTasks.value]).filter(t => shouldShowTaskInListView(t, allTasks.value))
 	},
 )
 
@@ -314,6 +309,9 @@ function handleListNavigation(e: KeyboardEvent) {
 	}
 
 	if (e.key === 'Enter') {
+		if (e.isComposing) {
+			return
+		}
 		e.preventDefault()
 		taskRefs.value[focusedIndex.value]?.click(e)
 	}
