@@ -212,6 +212,18 @@ func convertFiltersToDBFilterCond(rawFilters []*taskFilter, includeNulls bool) (
 			dbFilters = append(dbFilters, filter)
 			continue
 		}
+		log.Debugf("Ligne 215: %v", dbFilters)
+		if f.field == "subtask_label" {
+			subQuery := builder.Select("tr.task_id").
+				From("task_relations tr").
+				Join("INNER", "label_tasks lt", "tr.other_task_id = lt.task_id").
+				Join("INNER", "labels l", "lt.label_id = l.id").
+				Where(builder.Eq{"tr.relation_kind": RelationKindSubtask, "l.title": f.value})
+
+			dbFilters = append(dbFilters, builder.In("tasks.id", subQuery))
+			log.Debugf("Ligne 224: %v", dbFilters)
+			continue
+		}
 
 		if f.field == taskPropertyBucketID {
 			f.field = "task_buckets.`bucket_id`"

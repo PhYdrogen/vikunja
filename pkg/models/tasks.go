@@ -338,12 +338,31 @@ func getTasksForProjects(s *xorm.Session, projects []*Project, a web.Auth, opts 
 		taskMap[t.ID] = t
 	}
 
-	err = addMoreInfoToTasks(s, taskMap, a, view, opts.expand)
+	subtaskLabelFilter := getSubtaskLabelFilter(opts.parsedFilters)
+
+	err = addMoreInfoToTasks(s, taskMap, a, view, opts.expand, subtaskLabelFilter)
 	if err != nil {
 		return nil, 0, 0, err
 	}
 
 	return tasks, resultCount, totalItems, err
+}
+
+func getSubtaskLabelFilter(filters []*taskFilter) string {
+	log.Debugf("getSubtaskLabelFilter: %+v", filters)
+	for _, f := range filters {
+		if f.field == "subtask_label" {
+			if val, ok := f.value.(string); ok {
+				return val
+			}
+		}
+		if nested, ok := f.value.([]*taskFilter); ok {
+			if val := getSubtaskLabelFilter(nested); val != "" {
+				return val
+			}
+		}
+	}
+	return ""
 }
 
 // GetTaskByIDSimple returns a raw task without extra data by the task ID
@@ -399,7 +418,7 @@ func GetTasksByUIDs(s *xorm.Session, uids []string, a web.Auth) (tasks []*Task, 
 		taskMap[t.ID] = t
 	}
 
-	err = addMoreInfoToTasks(s, taskMap, a, nil, nil)
+	err = addMoreInfoToTasks(s, taskMap, a, nil, nil, "")
 	return
 }
 
@@ -484,7 +503,7 @@ func getTaskReminderMap(s *xorm.Session, taskIDs []int64) (taskReminders map[int
 	return
 }
 
-func addRelatedTasksToTasks(s *xorm.Session, taskIDs []int64, taskMap map[int64]*Task, a web.Auth) (err error) {
+func addRelatedTasksToTasks(s *xorm.Session, taskIDs []int64, taskMap map[int64]*Task, a web.Auth, subtaskLabelFilter string) (err error) {
 	relatedTasks := []*TaskRelation{}
 	err = s.In("task_id", taskIDs).Find(&relatedTasks)
 	if err != nil {
@@ -512,6 +531,35 @@ func addRelatedTasksToTasks(s *xorm.Session, taskIDs []int64, taskMap map[int64]
 		return err
 	}
 
+	// Filter subtasks if a label filter is set
+	allowedSubtaskIDs := make(map[int64]bool)
+	if subtaskLabelFilter != "" {
+		subtaskIDs := []int64{}
+		for _, rt := range relatedTasks {
+			if rt.RelationKind == RelationKindSubtask {
+				subtaskIDs = append(subtaskIDs, rt.OtherTaskID)
+			}
+		}
+
+		if len(subtaskIDs) > 0 {
+			// Find which of these subtasks have the label
+			validSubtasks := []int64{}
+			err = s.Table("label_tasks").
+				Join("INNER", "labels", "label_tasks.label_id = labels.id").
+				Where("labels.title = ?", subtaskLabelFilter).
+				In("label_tasks.task_id", subtaskIDs).
+				Cols("label_tasks.task_id").
+				Find(&validSubtasks)
+			if err != nil {
+				return err
+			}
+
+			for _, id := range validSubtasks {
+				allowedSubtaskIDs[id] = true
+			}
+		}
+	}
+
 	// NOTE: while it certainly be possible to run this function on	fullRelatedTasks again, we don't do this for performance reasons.
 
 	// Go through all task relations and put them into the task objects
@@ -521,6 +569,14 @@ func addRelatedTasksToTasks(s *xorm.Session, taskIDs []int64, taskMap map[int64]
 			log.Debugf("Related task not found for task relation: taskID=%d, otherTaskID=%d, relationKind=%v", rt.TaskID, rt.OtherTaskID, rt.RelationKind)
 			continue
 		}
+
+		// Apply subtask label filter
+		if subtaskLabelFilter != "" && rt.RelationKind == RelationKindSubtask {
+			if !allowedSubtaskIDs[rt.OtherTaskID] {
+				continue
+			}
+		}
+
 		fullRelatedTasks[rt.OtherTaskID].IsFavorite = taskFavorites[rt.OtherTaskID]
 
 		// We're duplicating the other task to avoid cycles as these can't be represented properly in json
@@ -592,7 +648,7 @@ func addBucketsToTasks(s *xorm.Session, a web.Auth, taskIDs []int64, taskMap map
 // It adds more stuff like assignees/labels/etc to a bunch of tasks
 //
 //nolint:gocyclo
-func addMoreInfoToTasks(s *xorm.Session, taskMap map[int64]*Task, a web.Auth, view *ProjectView, expand []TaskCollectionExpandable) (err error) {
+func addMoreInfoToTasks(s *xorm.Session, taskMap map[int64]*Task, a web.Auth, view *ProjectView, expand []TaskCollectionExpandable, subtaskLabelFilter string) (err error) {
 
 	// No need to iterate over users and stuff if the project doesn't have tasks
 	if len(taskMap) == 0 {
@@ -727,7 +783,7 @@ func addMoreInfoToTasks(s *xorm.Session, taskMap map[int64]*Task, a web.Auth, vi
 	}
 
 	// Get all related tasks
-	err = addRelatedTasksToTasks(s, taskIDs, taskMap, a)
+	err = addRelatedTasksToTasks(s, taskIDs, taskMap, a, subtaskLabelFilter)
 	return
 }
 
@@ -1820,7 +1876,7 @@ func (t *Task) ReadOne(s *xorm.Session, a web.Auth) (err error) {
 		}
 	}
 
-	err = addMoreInfoToTasks(s, taskMap, a, nil, expand)
+	err = addMoreInfoToTasks(s, taskMap, a, nil, expand, "")
 	if err != nil {
 		return
 	}

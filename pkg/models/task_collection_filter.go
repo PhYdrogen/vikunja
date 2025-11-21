@@ -336,6 +336,9 @@ func getValueForField(field reflect.StructField, rawValue string, loc *time.Loca
 func getNativeValueForTaskField(fieldName string, comparator taskFilterComparator, value string, loc *time.Location) (reflectField *reflect.StructField, nativeValue interface{}, err error) {
 
 	realFieldName := strings.ReplaceAll(strcase.ToCamel(fieldName), "Id", "ID")
+	if fieldName == "subtask_label" {
+		return nil, value, nil
+	}
 
 	if realFieldName == "Assignees" {
 		vals := strings.Split(value, ",")

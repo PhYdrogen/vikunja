@@ -167,7 +167,7 @@ func getRawTasksForExport(s *xorm.Session, projectIDs []int64, a web.Auth) (task
 		taskMap[t.ID] = t
 	}
 
-	err = addMoreInfoToTasks(s, taskMap, a, nil, nil)
+	err = addMoreInfoToTasks(s, taskMap, a, nil, nil, "")
 	if err != nil {
 		return nil, err
 	}
